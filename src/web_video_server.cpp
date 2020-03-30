@@ -5,6 +5,7 @@
 #include <vector>
 #include <sensor_msgs/image_encodings.hpp>
 #include <opencv2/opencv.hpp>
+#include <iostream>
 
 #include "web_video_server/web_video_server.h"
 #include "web_video_server/ros_compressed_streamer.h"
@@ -48,16 +49,37 @@ static bool ros_connection_logger(async_web_server_cpp::HttpServerRequestHandler
   return false;
 }
 
-WebVideoServer::WebVideoServer(rclcpp::Node::SharedPtr &nh, rclcpp::Node::SharedPtr &private_nh) :
+WebVideoServer::WebVideoServer(
+  rclcpp::Node::SharedPtr &nh,
+  rclcpp::Node::SharedPtr &private_nh,
+  int port,
+  int server_threads,
+  int ros_threads
+) :
     nh_(nh), handler_group_(
         async_web_server_cpp::HttpReply::stock_reply(async_web_server_cpp::HttpReply::not_found))
 {
   rclcpp::Parameter parameter;
+
   if (private_nh->get_parameter("port", parameter)) {
     port_ = parameter.as_int();
   } else {
-    port_ = 8080;
+    port_ = port;
   }
+
+  int server_threads_;
+  if (private_nh->get_parameter("server_threads", parameter)) {
+    server_threads_ = parameter.as_int();
+  } else {
+    server_threads_ = server_threads;
+  }
+
+  if (private_nh->get_parameter("ros_threads", parameter)) {
+    ros_threads_ = parameter.as_int();
+  } else {
+    ros_threads_ = ros_threads;
+  }
+
   if (private_nh->get_parameter("verbose", parameter)) {
     __verbose = parameter.as_bool();
   } else {
@@ -70,18 +92,6 @@ WebVideoServer::WebVideoServer(rclcpp::Node::SharedPtr &nh, rclcpp::Node::Shared
     address_ = "0.0.0.0";
   }
 
-  int server_threads;
-  if (private_nh->get_parameter("server_threads", parameter)) {
-    server_threads = parameter.as_int();
-  } else {
-    server_threads = 1;
-  }
-
-  if (private_nh->get_parameter("ros_threads", parameter)) {
-    ros_threads_ = parameter.as_int();
-  } else {
-    ros_threads_ = 2;
-  }
   if (private_nh->get_parameter("publish_rate", parameter)) {
     publish_rate_ = parameter.as_double();
   } else {
@@ -112,7 +122,7 @@ WebVideoServer::WebVideoServer(rclcpp::Node::SharedPtr &nh, rclcpp::Node::Shared
     server_.reset(
         new async_web_server_cpp::HttpServer(address_, boost::lexical_cast<std::string>(port_),
                                              boost::bind(ros_connection_logger, handler_group_, _1, _2, _3, _4),
-                                             server_threads));
+                                             server_threads_));
   }
   catch(boost::exception& e)
   {
@@ -298,11 +308,11 @@ bool WebVideoServer::handle_list_streams(const async_web_server_cpp::HttpRequest
     auto & topic_type = topic_and_types.second[0];  // explicitly take the first
     // TODO debugging
     fprintf(stderr, "topic_type: %s\n", topic_type.c_str());
-    if (topic_type == "sensor_msgs/Image")
+    if (topic_type == "sensor_msgs/msg/Image")
     {
       image_topics.push_back(topic_name);
     }
-    else if (topic_type == "sensor_msgs/CameraInfo")
+    else if (topic_type == "sensor_msgs/msg/CameraInfo")
     {
       camera_info_topics.push_back(topic_name);
     }
@@ -374,13 +384,26 @@ bool WebVideoServer::handle_list_streams(const async_web_server_cpp::HttpRequest
 
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
+  if (argc != 4)
+  {
+    printf( "Not the correct number of arguments. Exiting.");
+    return 1;
+  }
+
   rclcpp::init(argc, argv);
   auto nh = std::make_shared<rclcpp::Node>("web_video_server");
   auto private_nh = std::make_shared<rclcpp::Node>("_web_video_server");
 
-  web_video_server::WebVideoServer server(nh, private_nh);
+  web_video_server::WebVideoServer server(
+    nh,
+    private_nh,
+    atoi(argv[1]),
+    atoi(argv[2]),
+    atoi(argv[3])
+  );
+
   server.setup_cleanup_inactive_streams();
   server.spin();
 

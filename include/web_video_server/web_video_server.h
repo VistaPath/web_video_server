@@ -23,7 +23,13 @@ public:
    * @brief  Constructor
    * @return
    */
-  WebVideoServer(rclcpp::Node::SharedPtr &nh, rclcpp::Node::SharedPtr &private_nh);
+  WebVideoServer(
+      rclcpp::Node::SharedPtr &nh,
+      rclcpp::Node::SharedPtr &private_nh,
+      int port,
+      int server_threads,
+      int ros_threads
+  );
 
   /**
    * @brief  Destructor - Cleans up
@@ -70,3 +76,4 @@ private:
 }
 
 #endif
+
