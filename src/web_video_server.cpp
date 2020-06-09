@@ -138,7 +138,7 @@ WebVideoServer::~WebVideoServer()
 void WebVideoServer::setup_cleanup_inactive_streams()
 {
   std::function<void()> callback = std::bind(&WebVideoServer::cleanup_inactive_streams, this);
-  cleanup_timer_ = nh_->create_wall_timer(500ms, callback);
+  cleanup_timer_ = nh_->create_wall_timer(250ms, callback);
 }
 
 void WebVideoServer::spin()
